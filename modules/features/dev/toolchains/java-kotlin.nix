@@ -23,7 +23,7 @@
       programs.java = {
         enable = true;
         # package = pkgs.unstable.jdk;
-        package = pkgs.unstable.jdk11;
+        package = pkgs.javaPackages.compiler.temurin-bin.jdk-11;
       };
     };
   };
