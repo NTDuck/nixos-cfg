@@ -17,6 +17,11 @@
           "deepseek-r1:7b" # creative, chat
           "yi:6b-200k-q3_K_S" # reading
 
+          # SLM <1b
+          "qwen3.5:0.8b" # reasoning
+          "pedrolucas/pedro-open-coder-v2:0.9b-f16" # coding
+          "hf.co/IFM/K2-Horizon-0.9B-GGUF:BF16" # wildcard
+
           # Dense, coding
           "qwen3.5:4b-q4_K_M"
           "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:UD-Q4_K_XL"
