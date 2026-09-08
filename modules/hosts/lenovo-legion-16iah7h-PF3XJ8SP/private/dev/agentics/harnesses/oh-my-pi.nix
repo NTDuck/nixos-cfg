@@ -59,8 +59,13 @@
             models:
               - id: MiniMax/MiniMax-M3
                 name: MiniMax M3 (NetMind)
-                contextWindow: 196608
-                maxTokens: 65536
+                contextWindow: 1000000
+                maxTokens: 128000
+
+              - id: zai-org/GLM-5.3-Flash
+                name: GLM 5.3 Flash (NetMind)
+                contextWindow: 1000000
+                maxTokens: 128000
       '';
 
       home.shellAliases = {
