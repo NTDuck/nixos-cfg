@@ -251,15 +251,25 @@
                       url = "https://chatgpt.com/";
                       position = 202;
                     };
+                    "Mistral" = {
+                      id = "53fe15cd-f375-4fd6-ab55-7ba4c138d7a0";
+                      url = "https://chat.mistral.ai/work";
+                      position = 203;
+                    };
+                    "Perplexity" = {
+                      id = "d390204e-c74d-4be5-8b4f-fadff576db3f";
+                      url = "https://www.perplexity.ai/";
+                      position = 204;
+                    };
                     "Qwen" = {
                       id = "e10ba8f6-5473-4017-8dba-bb10b1172bdc";
                       url = "https://chat.qwen.ai/";
-                      position = 203;
+                      position = 205;
                     };
                     "Deepseek" = {
                       id = "74cfe18b-0a3b-4d7f-9adb-def0ef75753b";
                       url = "https://chat.deepseek.com/";
-                      position = 204;
+                      position = 206;
                     };
                   };
                 };
