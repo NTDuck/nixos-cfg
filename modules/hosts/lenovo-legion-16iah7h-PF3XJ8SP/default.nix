@@ -62,7 +62,6 @@
       den.aspects.services.gnome-keyring
       den.aspects.services.gvfs
       den.aspects.services.kanshi
-      den.aspects.services.keyd
       {
         internalOutput = "eDP-1";
 
@@ -73,6 +72,7 @@
           "HDMI-2"
         ];
       }
+      den.aspects.services.keyd
       den.aspects.services.nftables
       den.aspects.services.pipewire
       den.aspects.services.polkit
