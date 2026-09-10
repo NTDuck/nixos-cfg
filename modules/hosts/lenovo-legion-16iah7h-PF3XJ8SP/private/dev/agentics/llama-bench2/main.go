@@ -624,6 +624,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
+			if m.GraphScroll < 0 {
+				m.GraphScroll = 0
+			}
+
 			if m.AutoFollow && m.Telemetry != nil {
 				samples := m.Telemetry.GetSamplesCopy()
 				colsNeeded := int(math.Ceil(float64(len(samples)) / float64(m.GraphZoom)))
@@ -633,6 +637,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.GraphScroll = 0
 				}
+			}
+
+			if m.GraphScroll < 0 {
+				m.GraphScroll = 0
 			}
 
 			cmds = append(cmds, tea.Tick(100*time.Millisecond, func(time.Time) tea.Msg {
@@ -697,6 +705,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.GraphScroll -= 2
 						m.AutoFollow = false
 					}
+					if m.GraphScroll < 0 {
+						m.GraphScroll = 0
+					}
 				}
 			}
 			return m, nil
@@ -706,7 +717,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.scrollSelectionDown()
 			} else {
 				if msg.Y > m.Height-10 {
-					if m.TableScroll < len(m.Results)-3 {
+					maxTable := len(m.Results) - 3
+					if maxTable < 0 {
+						maxTable = 0
+					}
+					if m.TableScroll < maxTable {
 						m.TableScroll++
 					}
 				} else {
@@ -974,6 +989,9 @@ func (m Model) handleBenchmarkKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.GraphScroll -= 3
 			m.AutoFollow = false
 		}
+		if m.GraphScroll < 0 {
+			m.GraphScroll = 0
+		}
 	case "right", "l":
 		m.GraphScroll += 3
 		if m.Telemetry != nil {
@@ -988,7 +1006,11 @@ func (m Model) handleBenchmarkKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.TableScroll--
 		}
 	case "down", "j":
-		if m.TableScroll < len(m.Results)-3 {
+		maxTable := len(m.Results) - 3
+		if maxTable < 0 {
+			maxTable = 0
+		}
+		if m.TableScroll < maxTable {
 			m.TableScroll++
 		}
 	}
@@ -997,7 +1019,6 @@ func (m Model) handleBenchmarkKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleClick(x, y int) (tea.Model, tea.Cmd) {
 	if !m.InBenchmarkScreen {
-		// Selection Screen Clicks
 		maxVis := m.Height - 14
 		if maxVis < 3 {
 			maxVis = 3
@@ -1056,7 +1077,6 @@ func (m Model) handleClick(x, y int) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 			}
-			// Submit button
 			btnRow := contentStart + (end - m.TestScroll) + 1
 			if y == btnRow && x >= 2 && x <= 30 {
 				var selIndices []int
@@ -1137,10 +1157,8 @@ func (m Model) handleClick(x, y int) (tea.Model, tea.Cmd) {
 
 		// Header Bar (y == 5)
 		if y == 5 {
-			// Slider: Scale: ◄ [1x] ►
 			sliderX := axisStart + 22
 			if x >= sliderX && x <= sliderX+8 {
-				// Zoom decrease
 				zooms := []int{1, 2, 4, 8}
 				for i, z := range zooms {
 					if z == m.GraphZoom && i < len(zooms)-1 {
@@ -1150,7 +1168,6 @@ func (m Model) handleClick(x, y int) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			} else if x >= sliderX+9 && x <= sliderX+18 {
-				// Zoom increase
 				zooms := []int{1, 2, 4, 8}
 				for i, z := range zooms {
 					if z == m.GraphZoom && i > 0 {
@@ -1161,7 +1178,6 @@ func (m Model) handleClick(x, y int) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-			// Jump to End: [❯❯]
 			jumpX := axisStart + graphW - 4
 			if x >= jumpX && x <= jumpX+6 {
 				if m.Telemetry != nil {
@@ -1174,9 +1190,9 @@ func (m Model) handleClick(x, y int) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		// Checkbox Side Panel
+		// Checkbox Side Panel (starts at y == 6, row 0 is top border, rows 1..len are items)
 		chkPanelStartX := axisStart + graphW + 2
-		chkPanelW := 25
+		chkPanelW := 26
 		graphStartY := 6
 
 		if x >= chkPanelStartX && x <= chkPanelStartX+chkPanelW {
@@ -1539,7 +1555,7 @@ func (m Model) renderSelectionScreen() string {
 			)))
 		}
 
-	case 1: // Model
+	case 1: // Model (fuzzy search enabled)
 		lines = append(lines, "  "+lipgloss.NewStyle().Bold(true).Render("Select GGUF Model:"))
 		
 		searchPrompt := lipgloss.NewStyle().Faint(true).Render("Search: ")
@@ -1784,11 +1800,18 @@ func (m Model) renderSelectionScreen() string {
 	ctrl := "  Up/Down or Scroll: Navigate | Enter or Click: Select | q: Quit"
 	lines = append(lines, lipgloss.NewStyle().Faint(true).Render(ctrl))
 
-	return strings.Join(lines[:m.Height], "\n")
+	maxH := m.Height
+	if maxH > len(lines) {
+		maxH = len(lines)
+	}
+	if maxH < 0 {
+		maxH = 0
+	}
+	return strings.Join(lines[:maxH], "\n")
 }
 
 // =============================================================================
-// Benchmark Screen with Character-Based Linear Curves & Tooltip
+// Benchmark Screen with Character-Based Linear Curves & Safe Grid Tooltip
 // =============================================================================
 
 func (m Model) renderBenchmarkScreen() string {
@@ -1838,6 +1861,9 @@ func (m Model) renderBenchmarkScreen() string {
 
 	colsNeeded := int(math.Ceil(float64(totalSamples) / float64(m.GraphZoom)))
 	startCol := m.GraphScroll
+	if startCol < 0 {
+		startCol = 0
+	}
 	isRightmost := startCol >= colsNeeded-graphW
 
 	btnJumpStyle := lipgloss.NewStyle().Faint(true).Render("❯❯")
@@ -1851,14 +1877,13 @@ func (m Model) renderBenchmarkScreen() string {
 		headerPad = 2
 	}
 
-	// Row 5: Graph Header
+	// Graph Header Bar
 	lines = append(lines, fmt.Sprintf("  %s  %s%s[%s] %s",
 		lipgloss.NewStyle().Faint(true).Render("┌─ Graph of Metrics Over Time"),
 		sliderStr, strings.Repeat(" ", headerPad), btnJumpStyle,
 		lipgloss.NewStyle().Faint(true).Render("┐"),
 	))
 
-	// Metric range computations
 	metricMin := make(map[string]float64)
 	metricMax := make(map[string]float64)
 	metricMean := make(map[string]float64)
@@ -1890,10 +1915,111 @@ func (m Model) renderBenchmarkScreen() string {
 		}
 	}
 
-	// Find closest metric point to mouse hover
-	// Mouse coordinates in Bubble Tea: 0-indexed.
-	// Graph data is between columns [axisStart, axisStart + graphW).
-	// Graph rows are between [6, 6 + graphH).
+	// 2D Character Grid for Graph
+	type Cell struct {
+		Char      string
+		Color     string
+		Bold      bool
+		Faint     bool
+		IsCurve   bool
+		IsCross   bool
+		IsTooltip bool
+	}
+	grid := make([][]Cell, graphH)
+	for r := 0; r < graphH; r++ {
+		grid[r] = make([]Cell, graphW)
+		isGridH := (r%3 == 0)
+		for c := 0; c < graphW; c++ {
+			isGridV := (c%10 == 0)
+			if isGridH && isGridV {
+				grid[r][c] = Cell{Char: "┼", Color: "#2e2e2e", Faint: true}
+			} else if isGridH {
+				grid[r][c] = Cell{Char: "┄", Color: "#222222", Faint: true}
+			} else if isGridV {
+				grid[r][c] = Cell{Char: "┆", Color: "#222222", Faint: true}
+			} else {
+				grid[r][c] = Cell{Char: " "}
+			}
+		}
+	}
+	// Plot character-based curves (10 ┤ ╭───╮, 9 ┤ ╭──╯ ╰─╮, 8 ┤ ╭──╯, 6 ┤ ──────╯)
+	for _, mDef := range metricDefs {
+		if !m.MetricActive[mDef.ID] {
+			continue
+		}
+
+		minV := metricMin[mDef.ID]
+		maxV := metricMax[mDef.ID]
+
+		var curveRows []int
+		for c := 0; c < graphW; c++ {
+			sStart := (startCol + c) * m.GraphZoom
+			if sStart < 0 {
+				sStart = 0
+			}
+			if sStart >= totalSamples {
+				break
+			}
+			sEnd := sStart + m.GraphZoom
+			if sEnd > totalSamples {
+				sEnd = totalSamples
+			}
+			if sEnd < sStart {
+				sEnd = sStart
+			}
+
+			window := samples[sStart:sEnd]
+			if len(window) == 0 {
+				break
+			}
+
+			var sum float64
+			for _, s := range window {
+				sum += s.GetVal(mDef.ID)
+			}
+			val := sum / float64(len(window))
+			norm := math.Max(0, math.Min(1, (val-minV)/(maxV-minV)))
+			r := (graphH - 1) - int(norm*float64(graphH-1))
+			if r < 0 {
+				r = 0
+			}
+			if r >= graphH {
+				r = graphH - 1
+			}
+			curveRows = append(curveRows, r)
+		}
+
+		for c := 0; c < len(curveRows); c++ {
+			r := curveRows[c]
+			if c == 0 {
+				grid[r][c] = Cell{Char: "─", Color: mDef.Color, IsCurve: true}
+				continue
+			}
+
+			prevR := curveRows[c-1]
+			if r == prevR {
+				grid[r][c] = Cell{Char: "─", Color: mDef.Color, IsCurve: true}
+			} else if r < prevR { // climbing UP
+				grid[prevR][c-1] = Cell{Char: "╯", Color: mDef.Color, IsCurve: true}
+				for y := r + 1; y < prevR; y++ {
+					if y >= 0 && y < graphH {
+						grid[y][c] = Cell{Char: "│", Color: mDef.Color, IsCurve: true}
+					}
+				}
+				grid[r][c] = Cell{Char: "╭", Color: mDef.Color, IsCurve: true}
+			} else { // dropping DOWN
+				grid[prevR][c-1] = Cell{Char: "╮", Color: mDef.Color, IsCurve: true}
+				for y := prevR + 1; y < r; y++ {
+					if y >= 0 && y < graphH {
+						grid[y][c] = Cell{Char: "│", Color: mDef.Color, IsCurve: true}
+					}
+				}
+				grid[r][c] = Cell{Char: "╰", Color: mDef.Color, IsCurve: true}
+			}
+		}
+	}
+
+	// Hover Detection & Floating Tooltip in Grid
 	graphStartY := 6
 	isHovering := (m.MouseY >= graphStartY && m.MouseY < graphStartY+graphH && m.MouseX >= axisStart && m.MouseX < axisStart+graphW)
 
@@ -1901,6 +2027,7 @@ func (m Model) renderBenchmarkScreen() string {
 	var closestMetricCol int
 	var closestMetricRow int
 	var closestSample TelemetrySample
+	var closestDef MetricDef
 	hasClosest := false
 
 	if isHovering {
@@ -1920,6 +2047,12 @@ func (m Model) renderBenchmarkScreen() string {
 				maxV := metricMax[mDef.ID]
 				norm := math.Max(0, math.Min(1, (v-minV)/(maxV-minV)))
 				r := (graphH - 1) - int(norm*float64(graphH-1))
+				if r < 0 {
+					r = 0
+				}
+				if r >= graphH {
+					r = graphH - 1
+				}
 
 				dist := int(math.Abs(float64(r - mouseGridRow)))
 				if dist < minDist {
@@ -1932,94 +2065,102 @@ func (m Model) renderBenchmarkScreen() string {
 		}
 	}
 
-	// 2D Character Grid for the Graph
-	type Cell struct {
-		Char  string
-		Color string
-		Bold  bool
-	}
-	grid := make([][]Cell, graphH)
-	for r := 0; r < graphH; r++ {
-		grid[r] = make([]Cell, graphW)
-		for c := 0; c < graphW; c++ {
-			grid[r][c] = Cell{Char: " "}
-		}
-	}
-
-	// Plot character-based curves (10 ┤ ╭───╮, 9 ┤ ╭──╯ ╰─╮, 8 ┤ ╭──╯, 6 ┤ ──────╯)
-	for _, mDef := range metricDefs {
-		if !m.MetricActive[mDef.ID] {
-			continue
-		}
-
-		minV := metricMin[mDef.ID]
-		maxV := metricMax[mDef.ID]
-
-		var curveRows []int
-		for c := 0; c < graphW; c++ {
-			sStart := (startCol + c) * m.GraphZoom
-			sEnd := sStart + m.GraphZoom
-			if sEnd > totalSamples {
-				sEnd = totalSamples
-			}
-			if sStart >= totalSamples {
-				break
-			}
-			window := samples[sStart:sEnd]
-			if len(window) == 0 {
-				break
-			}
-
-			var sum float64
-			for _, s := range window {
-				sum += s.GetVal(mDef.ID)
-			}
-			val := sum / float64(len(window))
-			norm := math.Max(0, math.Min(1, (val-minV)/(maxV-minV)))
-			r := (graphH - 1) - int(norm*float64(graphH-1))
-			curveRows = append(curveRows, r)
-		}
-
-		// Draw curve using Unicode line characters
-		for c := 0; c < len(curveRows); c++ {
-			r := curveRows[c]
-			if c == 0 {
-				grid[r][c] = Cell{Char: "─", Color: mDef.Color}
-				continue
-			}
-
-			prevR := curveRows[c-1]
-			if r == prevR {
-				grid[r][c] = Cell{Char: "─", Color: mDef.Color}
-			} else if r < prevR { // climbing UP
-				grid[prevR][c-1] = Cell{Char: "╯", Color: mDef.Color}
-				for y := r + 1; y < prevR; y++ {
-					grid[y][c] = Cell{Char: "│", Color: mDef.Color}
-				}
-				grid[r][c] = Cell{Char: "╭", Color: mDef.Color}
-			} else { // dropping DOWN
-				grid[prevR][c-1] = Cell{Char: "╮", Color: mDef.Color}
-				for y := prevR + 1; y < r; y++ {
-					grid[y][c] = Cell{Char: "│", Color: mDef.Color}
-				}
-				grid[r][c] = Cell{Char: "╰", Color: mDef.Color}
-			}
-		}
-	}
-
-	// Highlight the single hovered point with a bold, noticeable marker
+	// Highlight the single hovered point with a bold marker & draw crosshairs
 	if hasClosest && closestMetricRow >= 0 && closestMetricRow < graphH && closestMetricCol >= 0 && closestMetricCol < graphW {
 		var cColor string
 		for _, mDef := range metricDefs {
 			if mDef.ID == closestMetricID {
 				cColor = mDef.Color
+				closestDef = mDef
 				break
 			}
 		}
+
+		// Horizontal dashed line across closestMetricRow
+		for c := 0; c < graphW; c++ {
+			if !grid[closestMetricRow][c].IsCurve {
+				grid[closestMetricRow][c] = Cell{Char: "╌", Color: cColor, IsCross: true}
+			}
+		}
+
+		// Vertical dashed line across closestMetricCol
+		for r := 0; r < graphH; r++ {
+			if !grid[r][closestMetricCol].IsCurve {
+				grid[r][closestMetricCol] = Cell{Char: "┆", Color: cColor, IsCross: true}
+			}
+		}
+
+		// Intersection point
 		grid[closestMetricRow][closestMetricCol] = Cell{
-			Char:  "●",
-			Color: cColor,
-			Bold:  true,
+			Char:    "●",
+			Color:   cColor,
+			Bold:    true,
+			IsCurve: true,
+		}
+		// Draw floating tooltip bubble directly into character grid (zero string slicing!)
+
+
+		currV := closestSample.GetVal(closestMetricID)
+		minV := metricMin[closestMetricID]
+		maxV := metricMax[closestMetricID]
+		meanV := metricMean[closestMetricID]
+
+		tag := closestDef.Name
+		if len(tag) > 12 {
+			tag = tag[:12]
+		}
+		hdrPad := 21 - len(tag) - 3
+		if hdrPad < 1 {
+			hdrPad = 1
+		}
+		ttHdr := fmt.Sprintf("┌ [%s] %s┐", tag, strings.Repeat("─", hdrPad))
+		ttL1 := fmt.Sprintf("│ cur: %-5.1f min:%-5.1f │", currV, minV)
+		ttL2 := fmt.Sprintf("│ max: %-5.1f mean:%-4.1f│", maxV, meanV)
+		ttBtm := "└" + strings.Repeat("─", 23) + "┘"
+
+		ttLines := []string{ttHdr, ttL1, ttL2, ttBtm}
+
+		tStartC := closestMetricCol - 10
+		if tStartC < 0 {
+			tStartC = 0
+		}
+		if tStartC+25 > graphW {
+			tStartC = graphW - 25
+		}
+		if tStartC < 0 {
+			tStartC = 0
+		}
+
+		tStartR := closestMetricRow + 1
+		if closestMetricRow >= 4 {
+			tStartR = closestMetricRow - 4
+		}
+		if tStartR < 0 {
+			tStartR = 0
+		}
+		if tStartR+4 > graphH {
+			tStartR = graphH - 4
+		}
+		if tStartR < 0 {
+			tStartR = 0
+		}
+
+		for i, line := range ttLines {
+			tr := tStartR + i
+			if tr >= 0 && tr < graphH {
+				runes := []rune(line)
+				for j, ch := range runes {
+					tc := tStartC + j
+					if tc >= 0 && tc < graphW {
+						grid[tr][tc] = Cell{
+							Char:      string(ch),
+							Color:     closestDef.Color,
+							Bold:      true,
+							IsTooltip: true,
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -2037,12 +2178,38 @@ func (m Model) renderBenchmarkScreen() string {
 	// Render each graph row side-by-side with Checkbox Panel
 	chkPanelW := 25
 	for r := 0; r < graphH; r++ {
-		// Y Axis Tick Label: e.g. "100 ┤ " or " 50 ┤ "
 		tickVal := 100.0 - (float64(r) / float64(graphH-1) * 100.0)
-		yTick := fmt.Sprintf("%3.0f ┤ ", tickVal)
-
+		var yTick string
+		if hasClosest && r == closestMetricRow {
+			currV := closestSample.GetVal(closestMetricID)
+			var valWithUnit string
+			switch closestDef.Unit {
+			case "°C":
+				valWithUnit = fmt.Sprintf("%.1f°C", currV)
+			case "W":
+				valWithUnit = fmt.Sprintf("%.1fW", currV)
+			case "%":
+				valWithUnit = fmt.Sprintf("%.1f%%", currV)
+			case "MHz":
+				valWithUnit = fmt.Sprintf("%.0fMHz", currV)
+			case "MiB":
+				valWithUnit = fmt.Sprintf("%.0fMiB", currV)
+			default:
+				valWithUnit = fmt.Sprintf("%.1f", currV)
+			}
+			yTick = lipgloss.NewStyle().Foreground(lipgloss.Color(closestDef.Color)).Bold(true).Render(fmt.Sprintf("%8s ┤ ", valWithUnit))
+		} else {
+			yTick = lipgloss.NewStyle().Faint(true).Render(fmt.Sprintf("%8.0f ┤ ", tickVal))
+		}
 		var graphRow strings.Builder
 		for c := 0; c < graphW; c++ {
+			cell := grid[r][c]
+			if cell.IsTooltip {
+				st := lipgloss.NewStyle().Foreground(lipgloss.Color(cell.Color)).Bold(cell.Bold)
+				graphRow.WriteString(st.Render(cell.Char))
+				continue
+			}
+
 			if tName, ok := testSeparators[c]; ok {
 				if r == 0 {
 					nameLabel := tName
@@ -2058,11 +2225,13 @@ func (m Model) renderBenchmarkScreen() string {
 				}
 			}
 
-			cell := grid[r][c]
 			if cell.Char != " " {
 				st := lipgloss.NewStyle().Foreground(lipgloss.Color(cell.Color))
 				if cell.Bold {
 					st = st.Bold(true)
+				}
+				if cell.Faint {
+					st = st.Faint(true)
 				}
 				graphRow.WriteString(st.Render(cell.Char))
 			} else {
@@ -2070,7 +2239,6 @@ func (m Model) renderBenchmarkScreen() string {
 			}
 		}
 
-		// Checkbox side-panel column
 		chkStr := ""
 		if r == 0 {
 			chkStr = "  " + lipgloss.NewStyle().Faint(true).Render("┌ Metrics "+strings.Repeat("─", chkPanelW-10)+"┐")
@@ -2103,70 +2271,24 @@ func (m Model) renderBenchmarkScreen() string {
 		))
 	}
 
-	// Bottom Axis: └─────── and Time Ticks
 	timeAxisPad := graphW
-	lines = append(lines, fmt.Sprintf("      %s", lipgloss.NewStyle().Faint(true).Render("└"+strings.Repeat("─", timeAxisPad))))
-	
-	// Time labels below axis: 0s, 5s, 10s...
+	lines = append(lines, fmt.Sprintf("         %s", lipgloss.NewStyle().Faint(true).Render("└"+strings.Repeat("─", timeAxisPad))))
+
 	var timeLabels strings.Builder
-	timeLabels.WriteString("       ")
+	timeLabels.WriteString("          ")
 	stepCols := 10
 	for c := 0; c < graphW; c += stepCols {
 		secVal := float64(c*m.GraphZoom) * 0.5
 		lbl := fmt.Sprintf("%-10.0fs", secVal)
-		timeLabels.WriteString(lbl)
-	}
-	lines = append(lines, lipgloss.NewStyle().Faint(true).Render(timeLabels.String()))
-
-	// Floating Tooltip Rendering: floats directly next to the hovered point
-	if hasClosest {
-		var closestDef MetricDef
-		for _, mDef := range metricDefs {
-			if mDef.ID == closestMetricID {
-				closestDef = mDef
-				break
-			}
-		}
-
-		currV := closestSample.GetVal(closestMetricID)
-		minV := metricMin[closestMetricID]
-		maxV := metricMax[closestMetricID]
-		meanV := metricMean[closestMetricID]
-
-		ttHeader := fmt.Sprintf("┌ [%s] %s┐", closestDef.Name, strings.Repeat("─", int(math.Max(0, float64(24-len(closestDef.Name)-4)))))
-		ttLine1 := fmt.Sprintf("│ cur: %-6.1f min: %-6.1f│", currV, minV)
-		ttLine2 := fmt.Sprintf("│ max: %-6.1f mean:%-6.1f│", maxV, meanV)
-		ttBottom := "└" + strings.Repeat("─", 26) + "┘"
-
-		ttCol := axisStart + closestMetricCol - 5
-		if ttCol < axisStart {
-			ttCol = axisStart
-		}
-		if ttCol+28 > axisStart+graphW {
-			ttCol = axisStart + graphW - 28
-		}
-
-		ttStartLine := graphStartY + closestMetricRow - 4
-		if closestMetricRow < 4 {
-			ttStartLine = graphStartY + closestMetricRow + 1
-		}
-
-		ttLines := []string{ttHeader, ttLine1, ttLine2, ttBottom}
-		for i, ttl := range ttLines {
-			targetLineIdx := ttStartLine + i
-			if targetLineIdx >= 0 && targetLineIdx < len(lines) {
-				orig := lines[targetLineIdx]
-				st := lipgloss.NewStyle().Foreground(lipgloss.Color(closestDef.Color)).Bold(true)
-				renderedTTL := st.Render(ttl)
-				// Overlay tooltip on top of row
-				if len(orig) >= ttCol+len(ttl) {
-					lines[targetLineIdx] = orig[:ttCol] + renderedTTL + orig[ttCol+len(ttl):]
-				}
-			}
+		if hasClosest && c <= closestMetricCol && closestMetricCol < c+stepCols {
+			timeLabels.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(closestDef.Color)).Bold(true).Render(fmt.Sprintf("%.1fs     ", closestSample.Timestamp)))
+		} else {
+			timeLabels.WriteString(lipgloss.NewStyle().Faint(true).Render(lbl))
 		}
 	}
-
+	lines = append(lines, timeLabels.String())
 	lines = append(lines, "")
+
 	lines = append(lines, "  "+lipgloss.NewStyle().Faint(true).Render(strings.Repeat("─", fullW)))
 	lines = append(lines, fmt.Sprintf("  %s %s",
 		lipgloss.NewStyle().Bold(true).Render("Per-Test Performance & Efficiency"),
@@ -2194,10 +2316,19 @@ func (m Model) renderBenchmarkScreen() string {
 			tStart = maxStart
 		}
 	}
+	if tStart < 0 {
+		tStart = 0
+	}
+	if tStart > len(m.Results) {
+		tStart = len(m.Results)
+	}
 
 	endR := tStart + visibleCount
 	if endR > len(m.Results) {
 		endR = len(m.Results)
+	}
+	if endR < tStart {
+		endR = tStart
 	}
 
 	visibleRows := m.Results[tStart:endR]
@@ -2255,20 +2386,26 @@ func (m Model) renderBenchmarkScreen() string {
 		lines = append(lines, "  "+lipgloss.NewStyle().Faint(true).Render("-"))
 	}
 
-	// Pad to bottom of screen
+	// Pad lines to m.Height - 2 so bottom divider & control text is pinned at bottom
 	for len(lines) < m.Height-2 {
 		lines = append(lines, "")
 	}
 
-	// Bottom pinned divider & dimmed control text
 	lines = append(lines, "  "+lipgloss.NewStyle().Faint(true).Render(strings.Repeat("─", fullW)))
 	lines = append(lines, lipgloss.NewStyle().Faint(true).Render("  Scroll: Up/Down/Wheel | Zoom: [-]/[+] or Slider | Jump: [❯❯] (End) | Toggle: 1-7/Click | q: Quit"))
 
-	return strings.Join(lines[:m.Height], "\n")
+	maxH := m.Height
+	if maxH > len(lines) {
+		maxH = len(lines)
+	}
+	if maxH < 0 {
+		maxH = 0
+	}
+	return strings.Join(lines[:maxH], "\n")
 }
 
 // =============================================================================
-// CLI Entrypoint
+// CLI Non-Interactive & Entrypoint
 // =============================================================================
 
 func printHelp() {
