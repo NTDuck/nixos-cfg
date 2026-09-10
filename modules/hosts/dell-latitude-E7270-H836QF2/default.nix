@@ -5,12 +5,14 @@
 
   den.aspects.dell-latitude-E7270-H836QF2 = {
     includes = [
-      den.aspects.battery
+      den.aspects.battery.power-profiles-daemon
+      den.aspects.battery.upower
       den.aspects.bluetooth
       den.aspects.bootloaders.systemd
-      den.aspects.browsers.firefox
+      den.aspects.browsers.chromium
+      den.aspects.browsers.zen-browser
       (den.aspects.compositors.mangowm {
-        terminal = pkgs: "${pkgs.unstable.foot}/bin/foot";
+        terminal = pkgs: "${pkgs.unstable.ghostty}/bin/ghostty";
       })
       den.aspects.dev
       den.aspects.editors.helix
@@ -20,6 +22,7 @@
       den.aspects.gaming.itch
       den.aspects.gaming.mangohud
       den.aspects.gaming.steam
+      den.aspects.gaming.wine
       den.aspects.gaming.wlib
       den.aspects.gaming.rpgmakermlinux-cicpoffs
       (den.aspects.greeters.tuigreet {
@@ -42,28 +45,41 @@
       den.aspects.nh
       den.aspects.nix-ld
       den.aspects.nur
+      den.aspects.office.pandoc
       den.aspects.office.libreoffice
+      den.aspects.office.texlive
       den.aspects.office.zathura
       den.aspects.productivity.mermaid
       den.aspects.productivity.obsidian
       den.aspects.productivity.taskwarrior
       den.aspects.productivity.tomato
+      den.aspects.productivity.world-monitor
       den.aspects.secrets.agenix
       den.aspects.services.cliphist
-      den.aspects.services.fcitx5
-      den.aspects.services.pipewire
-      den.aspects.services.dconf
-      den.aspects.services.gnome-keyring
-      den.aspects.services.polkit
       den.aspects.services.cloudflare-warp
+      den.aspects.services.dconf
+      den.aspects.services.fcitx5
+      den.aspects.services.gnome-keyring
+      den.aspects.services.gvfs
+      den.aspects.services.kanshi
+      den.aspects.services.keyd
       den.aspects.services.nftables
+      den.aspects.services.pipewire
+      den.aspects.services.polkit
       den.aspects.services.resolved
+      den.aspects.services.ssh
+      den.aspects.services.udisks2
+      den.aspects.services.xdg
       den.aspects.settings
-      den.aspects.shells.prompts.powerlevel10k
+      den.aspects.shells.prompts.starship
       den.aspects.shells.zsh
       den.aspects.swap.zram
-      den.aspects.terminals.foot
+      den.aspects.terminals.ghostty
       den.aspects.utilities.screenshots.flameshot
+      den.aspects.utilities.screenshots.gpu-screen-recorder
+      den.aspects.utilities.torrents.rtorrent
+      den.aspects.utilities.torrents.torrent-tui
+      den.aspects.utilities.torrents.webtorrent
       den.aspects.utilities.cava
       den.aspects.utilities.fastfetch
       den.aspects.utilities.p7zip
@@ -71,6 +87,8 @@
       den.aspects.utilities.rufus
       den.aspects.utilities.zoxide
       den.aspects.virtualization.docker
+      den.aspects.virtualization.kubernetes
+      den.aspects.virtualization.qemu
       den.aspects.virtualization.waydroid
       den.aspects.stylix
     ];
