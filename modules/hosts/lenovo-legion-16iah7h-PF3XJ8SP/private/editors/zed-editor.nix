@@ -4,8 +4,9 @@
       programs.zed-editor.userSettings = {
         agent = {
           default_model = {
-            provider = "ollama";
-            model = "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:UD-Q4_K_XL";
+            provider = "openai";
+            model = "openbmb/MiniCPM5-1B-GGUF:Q8_0";
+            api_url = "http://127.0.0.1:11434/v1";
             enable_thinking = true;
           };
           dock = "right";
