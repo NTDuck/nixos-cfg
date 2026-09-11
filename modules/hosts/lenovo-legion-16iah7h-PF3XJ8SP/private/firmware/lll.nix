@@ -1,10 +1,10 @@
 {den, ...}: {
   den.aspects.lenovo-legion-16iah7h-PF3XJ8SP = {
-    nixos = {pkgs, ...}: {
-      environment.systemPackages = [
-        pkgs.unstable.lenovo-legion
-      ];
+    includes = [
+      den.aspects.hardware.lenovo-legion-toolkit
+    ];
 
+    nixos = {...}: {
       # [[1]] In [[Fan Curve]], apply [[performance-ac]] preset + [Minifancurve if too cold]
       # [[2]] In [[Other Options]], apply:
       # | Configuration                        | Default   | Custom   |

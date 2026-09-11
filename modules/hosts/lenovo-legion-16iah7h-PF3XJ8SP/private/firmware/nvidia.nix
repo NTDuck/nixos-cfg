@@ -5,9 +5,12 @@
 }: {
   den.aspects.lenovo-legion-16iah7h-PF3XJ8SP = {
     nixos = {pkgs, ...}: {
-      imports = [
-        inputs.nixos-hardware.nixosModules.lenovo-legion-16iah7h
-      ];
+      # The nixos-hardware profile ships johnfanv2's `lenovo-legion-module`
+      # (same lenovo_legion.ko name as the toolkit driver) - replaced by
+      # den.aspects.hardware.lenovo-legion-toolkit.
+      # Was set by the nixos-hardware profile's Ampere defaults; keep open
+      # kernel modules explicitly.
+      hardware.nvidia.open = true;
 
       # hardware.opengl = {
       #   enable = true;
