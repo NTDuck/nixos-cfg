@@ -12,7 +12,7 @@
         };
 
         host = "127.0.0.1";
-        port = 11434; # keeps zed's existing local endpoint
+        port = 11435;
 
         # Router mode: sections are model ids, instances spawn on demand
         # with the CLI flags below; GGUFs download into LLAMA_CACHE
@@ -44,7 +44,7 @@
           # order changes — a live CUDA context on a TB-tunneled GPU is
           # what hard-freezes the desktop on cable pull.
           "--device"
-          "CUDA1"
+          "CUDA0"
           "-ngl"
           "all"
           "--fit"
