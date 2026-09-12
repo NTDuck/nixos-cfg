@@ -38,32 +38,58 @@
           # over-budget model fails loudly instead of silently falling
           # back to CPU.
           #
-          # The daemon is pinned to the laptop 3060 BY UUID below (not
-          # CUDA0): with the 3090 hotplugged, enumeration order flips and
-          # CUDA0 would point at the eGPU — a TB cable pull then kills a
-          # live CUDA context and hard-freezes the desktop. The 3090 is
-          # for interactive jobs (llama-bench, ad-hoc servers).
+          # Pinned by UUID via EnvironmentFile (below): 3090 when the
+          # eGPU dock is attached, laptop 3060 otherwise. Pinning by UUID
+          # (never CUDA0) keeps the context stable across enumeration
+          # order changes — a live CUDA context on a TB-tunneled GPU is
+          # what hard-freezes the desktop on cable pull.
           "--device"
           "CUDA0"
           "-ngl"
           "all"
           "--fit"
           "off"
-          # mmap the GGUF: NVMe -> RAM pages pulled on demand,
-          # zero CPU layer execution.
+          # mmap the GGUF: weights tier RAM -> NVMe via page cache with
+          # zero CPU layer execution (cold pages fault in on demand).
           "--load-mode"
           "mmap"
           "--flash-attn"
           "on"
           "-c"
-          "8192" # cap ctx (models advertise up to 131k) to bound KV VRAM
+          "32768" # native ctx (262k needs yarn; 32k is the sweet spot for KV VRAM)
+          # Qwen3.8 official thinking-mode sampling (Qwen model card):
+          "--temp"
+          "1.0"
+          "--top-p"
+          "0.95"
+          "--top-k"
+          "20"
+          "--repeat-penalty"
+          "1.0"
         ];
       };
 
-      systemd.services.llama-cpp.serviceConfig.Environment = [
-        # Laptop 3060 only (see extraFlags comment above).
-        "CUDA_VISIBLE_DEVICES=GPU-a81782bc-e6d4-e015-445a-d413a0e94529"
+      # Device selection is dynamic: egpu-adopt.service rewrites
+      # /run/egpu/llama-cpp.env (3090 UUID when the dock is attached,
+      # 3060 UUID otherwise) and restarts this daemon. Pinning by UUID
+      # (never CUDA0) keeps the CUDA context stable across enumeration
+      # order changes.
+      # Seed the env file at boot; egpu-adopt / egpu-release rewrite it on
+      # dock transitions (systemd loads EnvironmentFile after preStart, so
+      # the preStart copy is in place before the daemon spawns).
+      systemd.tmpfiles.rules = [
+        "d /run/egpu 0755 root root -"
       ];
+      environment.etc."egpu-llama-default.env".text =
+        "CUDA_VISIBLE_DEVICES=GPU-a81782bc-e6d4-e015-445a-d413a0e94529\n";
+      systemd.services.llama-cpp = {
+        # Copy the default (3060) in if the dock hasn't already claimed it.
+        preStart = ''
+          mkdir -p /run/egpu
+          [ -s /run/egpu/llama-cpp.env ] || cp /etc/egpu-llama-default.env /run/egpu/llama-cpp.env
+        '';
+        serviceConfig.EnvironmentFile = "/run/egpu/llama-cpp.env";
+      };
 
       environment.systemPackages = [
         config.services.llama-cpp.package

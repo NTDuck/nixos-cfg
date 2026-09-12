@@ -7,6 +7,28 @@
     }: {
       home.file.".omp/agent/models.yml".text = ''
         providers:
+          # Local llama-cpp router (services.llama-cpp): MiniCPM resident
+          # on the laptop 3060; Qwen3.8-27B tiers to the 3090 eGPU when
+          # the UT3G dock is attached (3090 -> RAM -> NVMe mmap tiering).
+          llama-local:
+            baseUrl: http://127.0.0.1:11434/v1
+            api: openai-completions
+            apiKey: none
+            models:
+              - id: openbmb/MiniCPM5-1B-GGUF:Q8_0
+                name: MiniCPM5 1B (local 3060)
+                reasoning: false
+                input: [text]
+                contextWindow: 8192
+                maxTokens: 8192
+
+              - id: unsloth/Qwen3.8-27B-GGUF:Q4_K_XL
+                name: Qwen3.8 27B (local 3090)
+                reasoning: false
+                input: [text]
+                contextWindow: 32768
+                maxTokens: 32768
+
           # https://docs.orcarouter.ai/integrations/oh-my-pi
           orcarouter:
             baseUrl: https://api.orcarouter.ai/v1

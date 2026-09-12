@@ -36,9 +36,22 @@
         gpu="0000:06:00.0"
         sysd=${config.systemd.package}/bin/systemctl
 
-        # Healthy already: nothing to do (udev fires this on every USB4
-        # rebind, and the boot unit fires every boot).
+        # llama-cpp tiering runs FIRST: healthy dock or not, the env file
+        # must reflect what nvidia-smi sees right now (3090 when present,
+        # 3060 fallback otherwise), and the daemon restarted on flip.
+        # (3090 -> weights mmap-tier RAM -> NVMe; --fit off forbids any
+        # CPU layer fallback.)
+        mkdir -p /run/egpu
         if ${nvidiaSmi} -L 2>/dev/null | grep -q 'RTX 3090'; then
+          echo "CUDA_VISIBLE_DEVICES=GPU-a4e36250-873d-62c5-912e-fde18d238a6c" > /run/egpu/llama-cpp.env
+        else
+          echo "CUDA_VISIBLE_DEVICES=GPU-a81782bc-e6d4-e015-445a-d413a0e94529" > /run/egpu/llama-cpp.env
+        fi
+
+        # Healthy already: nothing else to do (udev fires this on every
+        # USB4 rebind, and the boot unit fires every boot).
+        if ${nvidiaSmi} -L 2>/dev/null | grep -q 'RTX 3090'; then
+          $sysd try-restart llama-cpp.service 2>/dev/null || true
           exit 0
         fi
 
@@ -76,11 +89,28 @@
           sleep 1
         done
 
+        # nvkms-ghost guard: a failed first NVRM bind leaves a half-dead
+        # nvkms/Evo device behind; a later unbind/unload of it then spins
+        # forever in nvEvoDisableVblankSemControl and freezes the desktop
+        # (seen 3x on 2026-09-12). If the rescan rebind produced a KMS card
+        # for the tunneled GPU while the first bind had failed, drop the
+        # eGPU's DRM attachment (nvidia.ko compute stays); card0 removal
+        # while the compositor is on the other card is verified-clean.
+        if ${nvidiaSmi} -L 2>/dev/null | grep -q 'RTX 3090' \
+           && [ -e /sys/class/drm/card0 ] \
+           && readlink -f /sys/class/drm/card0/device 2>/dev/null | grep -q "$gpu"; then
+          echo "egpu-adopt: dropping tunneled GPU's KMS attachment (nvkms ghost guard)" >&2
+          echo "$gpu" > /sys/bus/pci/drivers/nvidia-drm/unbind 2>/dev/null || true
+          sleep 1
+        fi
+
         echo "egpu-adopt: restarting persistenced" >&2
         # try-restart is a no-op when the unit is stopped (it is, from step
         # 1) — use start-or-restart semantics.
         $sysd try-restart nvidia-persistenced.service 2>/dev/null || true
         $sysd start nvidia-persistenced.service 2>/dev/null || true
+
+        # llama-cpp already follows via the tiering block at the top.
 
         # Final health check: NVRM init may still fail (objClInitPcieChipset
         # through the tunnel); report loudly instead of exiting clean.
@@ -88,11 +118,26 @@
           echo "egpu-adopt: 3090 alive" >&2
         else
           echo "egpu-adopt: 3090 still missing after rescan" >&2
-          exit 1
         fi
       '';
+
+
+      # Dock detach: the 3090's CUDA context must die BEFORE the tunnel
+      # does. Cable pull gives no warning, so this only helps for graceful
+      # teardown paths; the llama UUID pin (never CUDA0) is what makes an
+      # abrupt pull survivable for the desktop.
+      egpu-release = pkgs.writeShellScriptBin "egpu-release" ''
+        set -eu
+        sysd=${config.systemd.package}/bin/systemctl
+        echo "egpu-release: reverting llama-cpp to laptop 3060" >&2
+        mkdir -p /run/egpu
+        echo "CUDA_VISIBLE_DEVICES=GPU-a81782bc-e6d4-e015-445a-d413a0e94529" > /run/egpu/llama-cpp.env
+        $sysd try-restart llama-cpp.service 2>/dev/null || true
+        $sysd stop nvidia-persistenced.service 2>/dev/null || true
+        echo "egpu-release: done" >&2
+      '';
     in {
-      environment.systemPackages = [egpu-adopt];
+      environment.systemPackages = [egpu-adopt egpu-release];
 
       # Fires when boltd authorizes a new Thunderbolt/USB4 device (the UT3G
       # router 0-1), then again on the tunneled PCI device appearance.
@@ -104,6 +149,8 @@
         ACTION!="remove", SUBSYSTEM=="thunderbolt", ATTRS{device_name}=="UT4G", TAG+="systemd", ENV{SYSTEMD_WANTS}="egpu-adopt.service"
         # Tunneled NVIDIA GPU appearance (belt & braces if bolt already stored)
         ACTION!="remove", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030000", ENV{PCI_SLOT_NAME}=="0000:06:00.0", TAG+="systemd", ENV{SYSTEMD_WANTS}="egpu-adopt.service"
+        # Dock detach: revert llama tiering before the tunnel is gone
+        ACTION=="remove", SUBSYSTEM=="thunderbolt", ATTRS{device_name}=="UT4G", TAG+="systemd", ENV{SYSTEMD_WANTS}="egpu-release.service"
       '';
 
       systemd.services.egpu-adopt = {
@@ -120,6 +167,15 @@
           ExecStart = "${egpu-adopt}/bin/egpu-adopt";
           # Tunnel bring-up races bolt authorization; give it room.
           TimeoutStartSec = "120";
+        };
+      };
+
+      systemd.services.egpu-release = {
+        description = "NixOS eGPU releaser: revert llama tiering on dock detach";
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = "${egpu-release}/bin/egpu-release";
+          TimeoutStartSec = "60";
         };
       };
     };
