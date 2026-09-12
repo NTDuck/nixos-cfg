@@ -44,7 +44,7 @@
           # order changes — a live CUDA context on a TB-tunneled GPU is
           # what hard-freezes the desktop on cable pull.
           "--device"
-          "CUDA0"
+          "CUDA1"
           "-ngl"
           "all"
           "--fit"
@@ -80,8 +80,7 @@
       systemd.tmpfiles.rules = [
         "d /run/egpu 0755 root root -"
       ];
-      environment.etc."egpu-llama-default.env".text =
-        "CUDA_VISIBLE_DEVICES=GPU-a81782bc-e6d4-e015-445a-d413a0e94529\n";
+      environment.etc."egpu-llama-default.env".text = "CUDA_VISIBLE_DEVICES=GPU-a81782bc-e6d4-e015-445a-d413a0e94529\n";
       systemd.services.llama-cpp = {
         # Copy the default (3060) in if the dock hasn't already claimed it.
         preStart = ''

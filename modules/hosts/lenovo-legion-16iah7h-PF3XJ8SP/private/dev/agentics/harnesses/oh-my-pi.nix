@@ -10,7 +10,7 @@
           # Local llama-cpp router (services.llama-cpp): MiniCPM resident
           # on the laptop 3060; Qwen3.8-27B tiers to the 3090 eGPU when
           # the UT3G dock is attached (3090 -> RAM -> NVMe mmap tiering).
-          llama-local:
+          llama-cpp:
             baseUrl: http://127.0.0.1:11434/v1
             api: openai-completions
             apiKey: none
