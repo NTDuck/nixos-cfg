@@ -5,11 +5,9 @@
 }: {
   den.aspects.lenovo-legion-16iah7h-PF3XJ8SP = {
     nixos = {pkgs, ...}: {
-      # The nixos-hardware profile ships johnfanv2's `lenovo-legion-module`
-      # (same lenovo_legion.ko name as the toolkit driver) - replaced by
-      # den.aspects.hardware.lenovo-legion-toolkit.
-      # Was set by the nixos-hardware profile's Ampere defaults; keep open
-      # kernel modules explicitly.
+      # The nixos-hardware Legion profile (not included) ships the same
+      # johnfanv2 `lenovo-legion-module` that firmware/lll.nix wires up.
+      # hardware.nvidia.open was the profile's default; kept explicit.
       hardware.nvidia.open = true;
 
       # hardware.opengl = {

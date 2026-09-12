@@ -1,6 +1,10 @@
 {den, ...}: {
   den.aspects.lenovo-legion-16iah7h-PF3XJ8SP = {
-    nixos = {pkgs, ...}: {
+    nixos = {
+      config,
+      pkgs,
+      ...
+    }: {
       services.llama-cpp = {
         enable = true;
         package = pkgs.unstable.llama-cpp.override {
@@ -17,7 +21,7 @@
           "openbmb/MiniCPM5-1B-GGUF:Q8_0" = {
             hf-repo = "openbmb/MiniCPM5-1B-GGUF";
             hf-file = "MiniCPM5-1B-Q8_0.gguf";
-            load-on-startup = false; # 1 GB, always resident on the 3060
+            load-on-startup = true; # 1 GB, always resident on the 3060
           };
 
           # eGPU (RTX 3090) class: 16.3 GB, does not fit the 6 GB 3060;
@@ -49,6 +53,10 @@
           "8192" # cap ctx (models advertise up to 131k) to bound KV VRAM
         ];
       };
+
+      environment.systemPackages = [
+        config.services.llama-cpp.package
+      ];
 
       # keep the existing memlock pins from the previous setup
       security.pam.loginLimits = [
