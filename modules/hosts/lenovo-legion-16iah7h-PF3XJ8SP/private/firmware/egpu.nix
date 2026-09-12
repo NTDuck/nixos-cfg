@@ -1,5 +1,4 @@
 {
-  den,
   ...
 }: {
   den.aspects.lenovo-legion-16iah7h-PF3XJ8SP = {
@@ -16,6 +15,14 @@
       # 2. nvidia-persistenced enumerated GPUs at its own startup and never
       #    adopts hotplugged devices, so nvidia-smi/NVML hide the 3090 until
       #    the daemon restarts.
+      # 3. The original udev rules matched only ACTION=="add". With the dock
+      #    attached at power-on, boltd re-authorizes ("changed", not "add")
+      #    and the tunneled PCI device appears before this generation's rule
+      #    is loaded — the uevent is never replayed, egpu-adopt never runs,
+      #    /dev/nvidia1 never appears, and CUDA/Vulkan/DXVK see only the
+      #    3060 + llvmpipe (seen 2026-09-12 boot d2a56796). ACTION!=remove
+      #    matches coldplug replay and every rebind; a multi-user.target
+      #    boot trigger covers the pre-udevd window outright.
       # Freeze-safe surgery order (a naive remove/rescan of a live-bound GPU
       # hard-freezes the desktop — seen 2026-09-12):
       #  1. stop persistenced (drops NVML handles; it can't adopt hotplugs
@@ -23,14 +30,22 @@
       #  2. unbind nvidia from the 3090 BEFORE removing it
       #  3. remove + rescan, wait for a clean rebind
       #  4. restart persistenced last so NVML enumerates both GPUs
+      nvidiaSmi = "${config.hardware.nvidia.package.bin}/bin/nvidia-smi";
       egpu-adopt = pkgs.writeShellScriptBin "egpu-adopt" ''
         set -eu
         gpu="0000:06:00.0"
         sysd=${config.systemd.package}/bin/systemctl
 
+        # Healthy already: nothing to do (udev fires this on every USB4
+        # rebind, and the boot unit fires every boot).
+        if ${nvidiaSmi} -L 2>/dev/null | grep -q 'RTX 3090'; then
+          exit 0
+        fi
+
         # Wait for the tunneled GPU to appear behind the ASM2464 bridge
         # (bolt authorizes -> tunnel -> 04:00.0 -> 05:00.0 -> 06:00.0).
-        for _ in $(seq 1 30); do
+        # Late arrivals are covered by the udev rule; don't sit here long.
+        for _ in $(seq 1 5); do
           [ -e "/sys/bus/pci/devices/$gpu" ] && break
           sleep 1
         done
@@ -66,24 +81,40 @@
         # 1) — use start-or-restart semantics.
         $sysd try-restart nvidia-persistenced.service 2>/dev/null || true
         $sysd start nvidia-persistenced.service 2>/dev/null || true
-        echo "egpu-adopt: done" >&2
+
+        # Final health check: NVRM init may still fail (objClInitPcieChipset
+        # through the tunnel); report loudly instead of exiting clean.
+        if ${nvidiaSmi} -L 2>/dev/null | grep -q 'RTX 3090'; then
+          echo "egpu-adopt: 3090 alive" >&2
+        else
+          echo "egpu-adopt: 3090 still missing after rescan" >&2
+          exit 1
+        fi
       '';
     in {
       environment.systemPackages = [egpu-adopt];
 
       # Fires when boltd authorizes a new Thunderbolt/USB4 device (the UT3G
       # router 0-1), then again on the tunneled PCI device appearance.
+      # ACTION!=remove also matches coldplug replay and boltd's
+      # "authorized -> authorized" change events, which the old
+      # ACTION=="add" rules missed when the dock was attached at power-on.
       services.udev.extraRules = ''
         # Thunderbolt router (boltctl authorizes -> kernel creates the router)
-        ACTION=="add", SUBSYSTEM=="thunderbolt", ATTRS{device_name}=="UT4G", TAG+="systemd", ENV{SYSTEMD_WANTS}="egpu-adopt.service"
+        ACTION!="remove", SUBSYSTEM=="thunderbolt", ATTRS{device_name}=="UT4G", TAG+="systemd", ENV{SYSTEMD_WANTS}="egpu-adopt.service"
         # Tunneled NVIDIA GPU appearance (belt & braces if bolt already stored)
-        ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030000", ENV{PCI_SLOT_NAME}=="0000:06:00.0", TAG+="systemd", ENV{SYSTEMD_WANTS}="egpu-adopt.service"
+        ACTION!="remove", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030000", ENV{PCI_SLOT_NAME}=="0000:06:00.0", TAG+="systemd", ENV{SYSTEMD_WANTS}="egpu-adopt.service"
       '';
 
       systemd.services.egpu-adopt = {
         description = "NixOS eGPU adopter: rescan tunneled 3090 and refresh NVML";
         after = ["bolt.service" "nvidia-persistenced.service"];
         wants = ["bolt.service"];
+        # Boot trigger: covers the window where the tunneled GPU appears
+        # before udev rules are loaded (no uevent is replayed into a rule
+        # that wasn't loaded yet). Dock-less boots skip via the condition.
+        wantedBy = ["multi-user.target"];
+        unitConfig.ConditionPathExists = "/sys/bus/pci/devices/0000:06:00.0";
         serviceConfig = {
           Type = "oneshot";
           ExecStart = "${egpu-adopt}/bin/egpu-adopt";
