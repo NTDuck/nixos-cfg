@@ -37,6 +37,12 @@
           # GPU-only: computation on CUDA, never CPU. --fit off so an
           # over-budget model fails loudly instead of silently falling
           # back to CPU.
+          #
+          # The daemon is pinned to the laptop 3060 BY UUID below (not
+          # CUDA0): with the 3090 hotplugged, enumeration order flips and
+          # CUDA0 would point at the eGPU — a TB cable pull then kills a
+          # live CUDA context and hard-freezes the desktop. The 3090 is
+          # for interactive jobs (llama-bench, ad-hoc servers).
           "--device"
           "CUDA0"
           "-ngl"
@@ -53,6 +59,11 @@
           "8192" # cap ctx (models advertise up to 131k) to bound KV VRAM
         ];
       };
+
+      systemd.services.llama-cpp.serviceConfig.Environment = [
+        # Laptop 3060 only (see extraFlags comment above).
+        "CUDA_VISIBLE_DEVICES=GPU-a81782bc-e6d4-e015-445a-d413a0e94529"
+      ];
 
       environment.systemPackages = [
         config.services.llama-cpp.package
