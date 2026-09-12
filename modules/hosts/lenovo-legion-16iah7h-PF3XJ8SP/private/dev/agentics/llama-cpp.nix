@@ -21,7 +21,7 @@
           "openbmb/MiniCPM5-1B-GGUF:Q8_0" = {
             hf-repo = "openbmb/MiniCPM5-1B-GGUF";
             hf-file = "MiniCPM5-1B-Q8_0.gguf";
-            load-on-startup = true; # 1 GB, always resident on the 3060
+            load-on-startup = false;
           };
 
           # eGPU (RTX 3090) class: 16.3 GB, does not fit the 6 GB 3060;
@@ -29,7 +29,7 @@
           "unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL" = {
             hf-repo = "unsloth/Qwen3.8-27B-GGUF";
             hf-file = "Qwen3.8-27B-UD-Q4_K_XL.gguf";
-            load-on-startup = false;
+            load-on-startup = true;
           };
         };
 
