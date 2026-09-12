@@ -37,7 +37,15 @@
         # then fails EGL at tuigreet and falls back to llvmpipe — the
         # compositor depends on the fbdev sideband. Freeze work continues
         # in firmware/egpu.nix instead (nvkms ghost-detection on rescan).
+        # NMI watchdog: kernel hard-locks (driver spinlock deadlock)
+        # self-reboot via the intel_oc_wdt hardware watchdog.
+        "nmi_watchdog=1"
       ];
+
+      # Freeze safety net: the eGPU driver-deadlock freezes the display
+      # but SysRq still works — Alt+SysRq+R,E,I,S,U,B (REISUB) recovers
+      # without power-cycling. Full sysrq bitmask.
+      boot.kernel.sysctl."kernel.sysrq" = 1;
 
       environment.systemPackages = [
         pkgs.unstable.libva
